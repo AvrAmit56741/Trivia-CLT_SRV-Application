@@ -6,6 +6,7 @@ import time
 import logging
 from datetime import datetime
 # Constants
+# new
 UDP_PORT = 13117
 TCP_PORT = 5555
 MAGIC_COOKIE = 0xabcddcba
