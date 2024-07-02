@@ -71,8 +71,14 @@ class TriviaServer:
         # To Make sure this field is always 32 characters long even if your server name is shorter.
         self.padded_server_name = self.server_name.ljust(32)[:32]
         # define UDP socket
+        # AF_INET stands for "Address Family - Internet." It is used to specify that the underlying network protocol is IPv4.
+        # SOCK_DGRAM stands for "Socket Datagram." It indicates that the socket will use the User Datagram Protocol (UDP).
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Set the socket option to allow the address to be reused immediately after the socket is closed (SO_REUSEADDR)
+        # socket.SO_REUSEADDR: Allows the socket to be bound to an address that is already in use.
+        # socket.SO_BROADCAST: Allows the socket to send broadcast messages - 255.255.255.255
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Set the socket option to enable broadcasting messages to all devices on the network (SO_BROADCAST)
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.udp_socket.bind(('0.0.0.0', UDP_PORT))
         # define TCP socket
@@ -216,6 +222,8 @@ class TriviaServer:
                         print_color(f"Error sending data to client {name}: {e}", "red")
 
                 time.sleep(3)
+                # threads handling client answers are joined to ensure that the main game 
+                # loop waits for all responses before proceeding to the next round.
                 for thread in threads:
                     thread.join()
 
