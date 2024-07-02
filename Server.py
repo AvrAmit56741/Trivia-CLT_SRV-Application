@@ -5,12 +5,14 @@ import random
 import time
 import logging
 from datetime import datetime
+import re
+from collections import defaultdict, Counter
+
 
 # Constants
 UDP_PORT = 13117
 TCP_PORT = 5555
 MAGIC_COOKIE = 0xabcddcba
-#CLIENT_RESPONSE_TIMEOUT = 13  # in seconds
 GAME_DURATION = 10  # in seconds
 WAIT_FOR_CLIENT_ANSWER_IN_ROUND = 10
 WAIT_FOR_2_CLIENTS_AT_LEAST = 25
@@ -59,6 +61,9 @@ def print_color(text, color):
 
 class TriviaServer:
     def __init__(self):
+        """
+        Initializes the TriviaServer class, sets up the UDP and TCP sockets, and initializes necessary variables.
+        """
         self.running = True
         self.origin_clients = []
         self.game_characters = []
@@ -88,6 +93,15 @@ class TriviaServer:
         self.starting_port = TCP_PORT
 
     def start(self, start_time=time.time()):
+        """
+        Starts the Trivia server, begins listening for client connections, and starts broadcasting messages.
+
+        Args:
+            start_time (float): The time at which the server starts. Default is the current time.
+
+        Note:
+            This function initiates threading for broadcast_message and wait_for_clients.
+        """
         self.running = True
         game_start_time = datetime.now()
         logging.info(f"Game started at {game_start_time}")
@@ -97,6 +111,12 @@ class TriviaServer:
         threading.Thread(target=self.wait_for_clients(start_time)).start()
 
     def broadcast_message(self):
+        """
+        Broadcasts a message to all devices on the network to announce the server's presence.
+
+        Note:
+            This function runs in a separate thread to continuously broadcast without blocking the main server operations.
+        """
         while True:
             # UDP Broadcast the message to all devices on the network
             broadcast_address = ('<broadcast>', UDP_PORT)
@@ -108,6 +128,15 @@ class TriviaServer:
             # Sleep for a short duration to avoid flooding the network
 
     def wait_for_clients(self, start_time=time.time()):
+        """
+        Waits for clients to connect to the server via TCP.
+
+        Args:
+            start_time (float): The time at which the server started. Default is the current time.
+
+        Note:
+            This function runs in a separate thread to allow concurrent handling of new client connections while the server continues other operations.
+        """
         threads = []
         #start_time = time.time()
         # every conected thread(client) start the 10 sec from the begining
@@ -133,6 +162,16 @@ class TriviaServer:
             time.sleep(1.3)
 
     def handle_tcp_client(self, conn, addr):
+        """
+        Handles communication with a connected client over TCP.
+
+        Args:
+            conn (socket.socket): The socket object for the client connection.
+            addr (tuple): The address of the client.
+
+        Note:
+            This function runs in a separate thread for each client to manage multiple client connections concurrently.
+        """
         try:
             data = conn.recv(1024)
             if data:
@@ -163,6 +202,12 @@ class TriviaServer:
 
     # notify all inactive players to prevent clients disconnect from server
     def notify_inactive_players(self, round):
+        """
+        Notifies all inactive players that they are out of the game for the current round.
+
+        Args:
+            round (int): The current round number.
+        """
         for client in self.game_inactive_players:  # Ensure all inactive players get updated
             name, conn = client
             try:
@@ -173,6 +218,12 @@ class TriviaServer:
                 print_color(f"Error notifying inactive client {name}: {e}", "red")
 
     def start_game(self):
+        """
+        Starts the trivia game, handles game rounds, and processes client answers.
+
+        Note:
+            This function initiates threading for handling client answers to process responses from multiple clients simultaneously.
+        """
         try:
             round = 1
             while len(self.clients) > 1:
@@ -376,7 +427,9 @@ class TriviaServer:
 
 
     def init_struct_for_new_game(self):
-
+        """
+        Initializes or resets the necessary structures and variables for a new game.
+        """
         self.game_inactive_players = []
         self.origin_clients = []
         self.clients_didnt_answer = []
@@ -387,6 +440,17 @@ class TriviaServer:
         self.correct_answers = []
         self.start(time.time())
     def handle_client_answer(self, conn, stat, client_name):
+        """
+        Handles receiving and processing an answer from a client during the game.
+
+        Args:
+            conn (socket.socket): The socket object for the client connection.
+            stat (str): The trivia statement/question sent to the client.
+            client_name (str): The name of the client.
+
+        Note:
+            This function runs in a separate thread for each client's answer to handle multiple responses concurrently.
+        """
         conn.settimeout(GAME_DURATION)  # Set timeout to GAME_DURATION for this client
         try:
             while True:
@@ -427,6 +491,13 @@ class TriviaServer:
             # handle_client the case of no one answered
 
     def remove_client(self, conn, client_name):
+        """
+        Removes a client from the game and closes the connection.
+
+        Args:
+            conn (socket.socket): The socket object for the client connection.
+            client_name (str): The name of the client to be removed.
+        """
         conn.close()
         self.clients = [(name, sock) for name, sock in self.clients if sock != conn]
         self.origin_clients = [(name, sock) for name, sock in self.origin_clients if sock != conn]
@@ -434,6 +505,10 @@ class TriviaServer:
         logging.info(f"Disconnected: {client_name} has been removed from the game.")
 
     def cancel_game_due_to_insufficient_players(self):
+        """
+        Cancels the game if there are not enough players and notifies any connected clients.
+        """
+
         if self.clients:
             client_name, client_conn = self.clients[0]  # Correctly unpack the tuple
             try:
@@ -447,6 +522,18 @@ class TriviaServer:
         print_color("Game canceled due to insufficient players.", "red")
 
     def find_available_port(self,max_attempts=50):
+        """
+        Finds an available TCP port starting from the initial port and increments until a free port is found or max_attempts is reached.
+
+        Args:
+            max_attempts (int): The maximum number of ports to try. Default is 50.
+
+        Returns:
+            int: The available port number.
+
+        Raises:
+            Exception: If no available port is found within the specified attempts.
+        """
         for attempt in range(max_attempts):
             try:
                 # Create a TCP/IP socket
@@ -465,6 +552,15 @@ class TriviaServer:
         raise Exception("Could not find an available port within the range.")
 
     def find_top_winner(self, log_file_path):
+        """
+        Analyzes the log file to find the player with the most wins.
+
+        Args:
+            log_file_path (str): The path to the log file.
+
+        Returns:
+            tuple: The name of the top winner and their win count.
+        """
         import re
         from collections import defaultdict
 
@@ -488,6 +584,15 @@ class TriviaServer:
             return "Error finding winner", 0
 
     def find_most_common_answer(self, log_file_path):
+        """
+        Analyzes the log file to find the most common answer given by players.
+
+        Args:
+            log_file_path (str): The path to the log file.
+
+        Returns:
+            tuple: The most common answer and its count.
+        """
         import re
         from collections import defaultdict
         from collections import Counter
@@ -514,9 +619,15 @@ class TriviaServer:
             return "Error finding the most common answer", 0
 
     def find_most_common_question(self, log_file_path):
-        import re
-        from collections import defaultdict, Counter
-        import logging
+        """
+        Analyzes the log file to find the most frequently asked trivia question.
+
+        Args:
+            log_file_path (str): The path to the log file.
+
+        Returns:
+            tuple: The most common question and its occurrence count.
+        """
 
         # Regex pattern to extract the question asked in each round
         question_regex = re.compile(r"The asked question of round \d+ is (.+)$")

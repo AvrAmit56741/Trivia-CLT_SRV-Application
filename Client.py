@@ -29,6 +29,13 @@ def print_color(text, color):
 
 class TriviaClient:
     def __init__(self, name=None, is_bot=False):
+        """
+        Initializes the TriviaClient class, sets up the UDP and TCP sockets, and initializes necessary variables.
+
+        Args:
+            name (str, optional): The name of the client. Default is None.
+            is_bot (bool): Indicates whether the client is a bot. Default is False.
+        """
         if is_bot:
             self.name = self.generate_bot_name()
         else:
@@ -47,12 +54,20 @@ class TriviaClient:
         self.server_found = False
 
     def generate_new_name(self):
-        """ Generate a new name by incrementing a suffix. """
+        """
+        Generates a new name by incrementing a suffix.
+        """
         self.name_suffix += 1
         self.name = f"{self.name}_{self.name_suffix}"
         print_color(f"New name generated: {self.name}", "yellow")
 
     def generate_bot_name(self):
+        """
+        Generates a random bot name from a predefined list of names.
+
+        Returns:
+            str: A randomly generated bot name.
+        """
         # Generate a random name from a list of names or by a random string
         names = ['LeBron', 'Kobe', 'Michael', 'Shaquille', 'Tim', 'Dirk', 'Stephen', 'Kevin', 'Kyrie', 'James',
         'Anthony', 'Russell', 'Giannis', 'Carmelo', 'Dwight', 'Chris', 'Damian', 'Blake', 'Paul', 'Derrick',
@@ -61,11 +76,23 @@ class TriviaClient:
         return f"BOT_{random.choice(names)}"
 
     def start(self):
+        """
+        Starts the Trivia client, begins listening for broadcast messages from the server, and connects to the server.
+
+        Note:
+            This function initiates threading for listen_for_broadcast and send_user_input.
+        """
         print(f"Client {self.name} started, listening for offer requests...")
         threading.Thread(target=self.send_user_input).start()
         self.listen_to_broadcast()
 
     def listen_to_broadcast(self):
+        """
+        Listens for UDP broadcast messages from the server to discover the server's presence.
+
+        Note:
+            This function runs in a separate thread to continuously listen for server broadcasts without blocking the main client operations.
+        """
         while True:
             data, addr = self.udp_socket.recvfrom(1024)
             try:
@@ -85,6 +112,12 @@ class TriviaClient:
 
 
     def connect_to_server(self, server_addr):
+        """
+        Connects to the Trivia server using the given address and port.
+
+        Args:
+            server_addr (tuple): A tuple containing the IP address and port of the server.
+        """
         if self.tcp_socket is None:  # Check if the socket needs to be reinitialized
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.settimeout(SERVER_NO_RESPONSE_TIMEOUT)  # Set timeout for response
@@ -107,6 +140,12 @@ class TriviaClient:
             sys.exit(1)
 
     def receive_server_data(self):
+        """
+        Receives game data from the server and processes it.
+
+        Note:
+            This function runs in a separate thread to handle incoming game data while the client performs other tasks.
+        """
         while self.running:
             try:
                 data = self.tcp_socket.recv(1024)
@@ -139,38 +178,14 @@ class TriviaClient:
                 #print(f"receive_server_data: Connection closed by server: {e}")
                 break
 
-    # def send_user_input(self):
-    #     while self.running:
-    #         try:
-    #             if msvcrt.kbhit():
-    #                 user_input = msvcrt.getche()
-    #                 if user_input == b'\r':  # Check if the enter key is pressed
-    #                     print()  # Move to the next line
-    #                     self.tcp_socket.sendall(
-    #                         b'\n')  # Send newline character to server to process the input as completed
-    #                 elif user_input == b'\x03':  # Check for Ctrl+C
-    #                     raise KeyboardInterrupt
-    #                 else:
-    #                     self.tcp_socket.sendall(
-    #                         user_input + b'\n')  # Send each character immediately followed by a newline
-    #         except socket.error as e:
-    #             print(f"send_user_input: Network error: {e}")
-    #             self.running = False
-    #             self.tcp_socket.close()
-    #             os._exit(0)
-    #         except KeyboardInterrupt:
-    #             print("send_user_input: Exiting...")
-    #             self.running = False
-    #             self.tcp_socket.close()
-    #             os._exit(0)
-    #         except Exception as e:
-    #             print(f"send_user_input: Error sending data: {e}")
-    #             self.running = False
-    #             self.tcp_socket.close()
-    #             os._exit(1)
-    #         time.sleep(0.1)
 
     def send_user_input(self):
+        """
+        Sends the client's answer to the server.
+
+        Note:
+            This function runs in a separate thread to handle user input while the client continues to receive data from the server.
+        """
         while self.running:
             try:
                 user_input = input()
@@ -194,7 +209,12 @@ class TriviaClient:
             time.sleep(1.3)
 
     def bot_behavior(self):
-        """Simulate bot behavior by waiting for a question and then automatically answering."""
+        """
+        Simulates bot behavior by waiting for a question and then automatically answering.
+
+        Note:
+            This function runs in a separate thread if the client is a bot to handle automated responses.
+        """
         print_color("Bot behavior started.", "green")
         out_of_game = False  # Flag to indicate whether the bot is out of the game
         while self.running:
@@ -237,7 +257,9 @@ class TriviaClient:
             self.close_connection()
 
     def close_connection(self):
-        #print("Server disconnected, attempting to close connection and restart broadcasting...")
+        """
+        Closes the connection to the server and resets the UDP socket for listening to new broadcast messages.
+        """
         self.running = False  # Stop the client's operations temporarily to reset connections
 
         try:
@@ -282,13 +304,6 @@ class TriviaClient:
             #print(f"Error restarting broadcast listening: {e}")
             self.running = False  # Ensure the client does not continue in an erroneous state
 
-    # def close_connection(self):
-    #     print("Server disconnected, listening for offer requests...")
-    #     self.running = False
-    #     self.tcp_socket.close()
-    #     self.tcp_socket = None  # Reset the socket
-    #     self.running = True
-    #     self.listen_to_broadcast()  # Restart listening for UDP broadcasts
 
 
 
